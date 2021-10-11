@@ -1,53 +1,78 @@
+#include <MPU9250_asukiaaa.h>
+#include <FreeRTOS.h>
+
+//defino los pines del I2C para el ESP32
+#define SDA_PIN 21
+#define SCL_PIN 22
+
+//defino el pin del led
 #define ledPin 34
 
-//defino los tiempos de cada tarea
-const portTickType ledDelay = 200 / portTICK_PERIOD_MS;
-const portTickType HolaMundoDelay = 1000 / portTICK_PERIOD_MS;
+// se define el objeto utilizado para esta libreria
+MPU9250_asukiaaa mySensor;
 
-int counter;
+double aX, aY, aZ;
+
+const portTickType ledDelay = 200 / portTICK_RATE_MS;
+const portTickType muestreoDelay = 100 / portTICK_RATE_MS;
+const portTickType envioDelay = 1000 / portTICK_RATE_MS;
+
 
 void setup() {
   
-  Serial.begin(112500);
+  //inicializo
   
-  //esp_err_t esp_register_freertos_idle_hook(vApplicationIdleHook);
-  
-//creo las dos tareas a realizar, pongo prioridad a 2 para evitar problemas con el reseteo del watchdog
-  xTaskCreate(LED,"LED",10000,NULL,2,NULL);
-  xTaskCreate(HolaMundo,"HolaMundo",10000,NULL,2,NULL);
+  Serial.begin(115200);
+  while(!Serial);
+  Serial.println("started");
+
+  #ifdef _ESP32_HAL_I2C_H_ // For ESP32
+  Wire.begin(SDA_PIN, SCL_PIN);
+  mySensor.setWire(&Wire);
+  #endif
+
+  mySensor.beginAccel();
+
+  xTaskCreate(MuestreoAcel,"MuestreoAcel",10000,NULL,2,NULL);
+  xTaskCreate(EnvioDatos,"EnvioDatos",10000,NULL,2,NULL);
 //inicio el scheduler
-  vTaskStartScheduler();
 
 }
 
-//tarea parpadeo led cada 200ms
-void LED(void*parameter)
+//defino las tareas
+
+void MuestreoAcel(void*parameter)
 {
-  pinMode(ledPin,OUTPUT);
-  while(1)
-  {
-   Serial.println("TareaLed");
-  digitalWrite(ledPin, HIGH);   
-  vTaskDelay(ledDelay); 
-  digitalWrite(ledPin, LOW);    
-  vTaskDelay(ledDelay); 
-  }
+while(1){
+  if (mySensor.accelUpdate() == 0) {
+    aX = mySensor.accelX();
+    aY = mySensor.accelY();
+    aZ = mySensor.accelZ();  
+    } else {
+    Serial.println("Cannod read accel values");
+    }
+    vTaskDelay(muestreoDelay);
+}
 }
 
-//tarea "Hola Mundo" por UART cada 1000ms
-void HolaMundo(void*parameter)
+void EnvioDatos(void*parameter)
 {
-  while(1)
-  {
-  Serial.println("Hola Mundo");
-  vTaskDelay(HolaMundoDelay);
-  }
+pinMode(ledPin,OUTPUT);
+   
+while(1){
+   Serial.println("accelX: " + String(aX));
+   Serial.println("accelY: " + String(aY));
+   Serial.println("accelZ: " + String(aZ));
+   digitalWrite(ledPin, HIGH);   
+   vTaskDelay(ledDelay); 
+   digitalWrite(ledPin, LOW); 
+   vTaskDelay(envioDelay); 
+}
 }
 
+void vApplicationIdleHook( void );
 
-//elimino la tarea "loop" par evitar errores con el reseteo del watchdog
+
 void loop() 
 {
-  vTaskDelete(NULL);
 }
-  

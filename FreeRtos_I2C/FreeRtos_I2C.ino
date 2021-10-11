@@ -1,17 +1,15 @@
 #include <MPU9250_asukiaaa.h>
 
 //defino los pines del I2C para el ESP32
-#ifdef _ESP32_HAL_I2C_H_
 #define SDA_PIN 21
 #define SCL_PIN 22
-#endif
 
+//defino el pin del led
 #define ledPin 34
-
 
 // se define el objeto utilizado para esta libreria
 MPU9250_asukiaaa mySensor;
-// Defino variables
+
 double aX, aY, aZ;
 
 const portTickType ledDelay = 200 / portTICK_RATE_MS;
@@ -37,47 +35,42 @@ void setup() {
   xTaskCreate(MuestreoAcel,"MuestreoAcel",10000,NULL,2,NULL);
   xTaskCreate(EnvioDatos,"EnvioDatos",10000,NULL,2,NULL);
 //inicio el scheduler
-  vTaskStartScheduler();
 
 }
 
-void MuestreoAcel(void*parameter){
+//defino las tareas
 
+void MuestreoAcel(void*parameter)
+{
 while(1){
   if (mySensor.accelUpdate() == 0) {
     aX = mySensor.accelX();
     aY = mySensor.accelY();
     aZ = mySensor.accelZ();  
-  } else {
+    } else {
     Serial.println("Cannod read accel values");
-  }
+    }
+    vTaskDelay(muestreoDelay);
 }
-  vTaskDelay(muestreoDelay); 
-
-  
 }
 
-void EnvioDatos(void*parameter){
-   pinMode(ledPin,OUTPUT);
-
+void EnvioDatos(void*parameter)
+{
+pinMode(ledPin,OUTPUT);
+   
 while(1){
-
    Serial.println("accelX: " + String(aX));
    Serial.println("accelY: " + String(aY));
    Serial.println("accelZ: " + String(aZ));
-
    digitalWrite(ledPin, HIGH);   
    vTaskDelay(ledDelay); 
-   digitalWrite(ledPin, LOW);    
+   digitalWrite(ledPin, LOW); 
    vTaskDelay(envioDelay); 
 }
-   
 }
 
 
 
-//elimino la tarea "loop" par evitar errores con el reseteo del watchdog
-void loop() {
-  vTaskDelete(NULL);
-
+void loop() 
+{
 }
